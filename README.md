@@ -2,6 +2,8 @@
 
 `cert-sync` is a Kubernetes controller that automatically syncs TLS certificates issued by [cert-manager](https://cert-manager.io/) to [AWS Certificate Manager (ACM)](https://aws.amazon.com/certificate-manager/). This enables seamless integration of Kubernetes-managed certificates with AWS services like Elastic Load Balancers and CloudFront, ensuring that your AWS resources always have the latest valid certificates without manual intervention.
 
+![Cert-Sync](./images/cer-sync.png)
+
 ## Description
 
 The `cert-sync` watches for Kubernetes `Secret` resources of type `kubernetes.io/tls` that are annotated for synchronization. When it detects a new or updated certificate issued by cert-manager, it checks if the certificate already exists in AWS ACM. If the certificate is new or has expired in ACM, the controller imports it into ACM. This process automates the distribution of certificates to AWS services, simplifies certificate management, and enhances security by keeping your AWS services up-to-date with the latest certificates issued in your Kubernetes cluster.
@@ -10,10 +12,10 @@ The `cert-sync` watches for Kubernetes `Secret` resources of type `kubernetes.io
 
 ### Prerequisites
 
-- **Go** version **v1.18.0+**
-- **Docker** version **19.03+**
-- **kubectl** version **v1.20+**
-- Access to a **Kubernetes v1.20+** cluster
+- **Go** version **v1.23.1+**
+- **Docker** version **25.00+**
+- **kubectl** version **v1.28+**
+- Access to a **Kubernetes v1.28+** cluster
 - An **AWS account** with permissions to use AWS Certificate Manager (ACM)
   - Necessary IAM permissions: `acm:ImportCertificate`, `acm:ListCertificates`, `acm:DescribeCertificate`, `acm:AddTagsToCertificate`
 
@@ -39,10 +41,10 @@ make deploy IMG=<your-registry>/cert-sync:<tag>
 
 **Create a sample `Secret` to trigger the controller:**
 
-You can apply the sample `Secret` provided in `config/samples/tls_secret.yaml`:
+You can apply the sample `Secret` provided in `samples/sample-tls-secret.yaml`:
 
 ```sh
-kubectl apply -f config/samples/tls_secret.yaml
+kubectl apply -f samples/sample-tls-secret.yaml
 ```
 
 This sample `Secret` includes the necessary annotations to trigger synchronization to AWS ACM.
@@ -54,7 +56,7 @@ This sample `Secret` includes the necessary annotations to trigger synchronizati
 **1. Delete the sample `Secret` from the cluster:**
 
 ```sh
-kubectl delete -f config/samples/tls_secret.yaml
+kubectl delete -f samples/sample-tls-secret.yaml
 ```
 
 **2. Undeploy the controller from the cluster:**
@@ -91,15 +93,19 @@ Contributions are welcome! To contribute to `cert-sync`, please follow these ste
 
 1. **Fork** the repository on GitHub.
 2. **Create a new branch** for your feature or bugfix:
+
    ```sh
    git checkout -b feature/your-feature-name
    ```
+
 3. **Make your changes** with clear commit messages.
 4. **Write tests** for new features or bug fixes.
 5. **Run tests** to ensure all existing tests pass:
+
    ```sh
    make test
    ```
+
 6. **Update documentation** as needed.
 7. **Open a pull request** with a detailed description of your changes.
 
@@ -114,6 +120,12 @@ If you have any questions or want to discuss your proposed changes, please open 
 **NOTE:** Run `make help` for more information on all available `make` targets.
 
 More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+
+## TODO
+
+1. Enhance the code with metric and other necessary details
+2. Add tests
+3. Add Github Action for auto build and deploy
 
 ## License
 

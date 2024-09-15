@@ -52,20 +52,20 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// Check if the secret has a sync annotation
 	if secret.Annotations["sync-to-acm"] != "true" {
-		log.Info("Secret does not have sync-to-acm annotations; skipping")
+		// log.Info("Secret does not have sync-to-acm annotations; skipping")
 		return ctrl.Result{}, nil
 	}
 
 	// Check if Secret is of type TLS
 	if secret.Type != corev1.SecretTypeTLS {
-		log.Info("Secret is not of type kubernetes.io/tls; skipping")
+		// log.Info("Secret is not of type kubernetes.io/tls; skipping")
 		return ctrl.Result{}, nil
 	}
 
 	// Get the domain name from the annotation
 	domainName, exists := secret.Annotations["cert-manager.io/common-name"]
 	if !exists || domainName == "" {
-		log.Info("Secret does not have cert-manager.io/common-name annotation; skipping")
+		// log.Info("Secret does not have cert-manager.io/common-name annotation; skipping")
 		return ctrl.Result{}, nil
 	}
 
@@ -73,7 +73,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	existingCertificate, err := r.findSecretByDomain(ctx, acmClient, domainName)
 	if err != nil {
 		log.Error(err, "Error finding certificate in ACM")
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: 5 * time.Minute}, err
 	}
 
 	// Extract the certificate and key
@@ -81,19 +81,18 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	key := secret.Data[corev1.TLSPrivateKeyKey]
 	leafCert, chainCert, err := splitCertificateChain(originalCrt)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: 5 * time.Minute}, err
 	}
 
 	if existingCertificate != nil {
-		log.Info("Found certificate in ACM", "CertificateArn: ", *existingCertificate.CertificateArn, "NotAfter: ", *existingCertificate.NotAfter)
-		if existingCertificate.NotAfter != nil && existingCertificate.NotAfter.Before(time.Now()) {
-			log.Info("Certificate exists in ACM and is expired; updating certificate")
+		log.Info("Found certificate in ACM", "CertificateArn: ", aws.ToString(existingCertificate.CertificateArn), "NotAfter: ", aws.ToTime(existingCertificate.NotAfter))
+		if existingCertificate.NotAfter != nil && existingCertificate.NotAfter.Before(time.Now().Add(72*time.Hour)) {
+			log.Info("Certificate exists in ACM and is going to expire; updating certificate")
 
 			// Process to sync (import) the certificate
-
-			if err := r.updateToAcm(ctx, acmClient, &secret, *existingCertificate.CertificateArn, leafCert, chainCert, key); err != nil {
+			if err := r.updateToAcm(ctx, acmClient, &secret, existingCertificate.CertificateArn, leafCert, chainCert, key); err != nil {
 				log.Error(err, "Failed to sync certificate to ACM")
-				return ctrl.Result{}, err
+				return ctrl.Result{RequeueAfter: 5 * time.Minute}, err
 			}
 
 		} else {
@@ -105,12 +104,12 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		// Sync to ACM
 		if err := r.importToAcm(ctx, acmClient, &secret, leafCert, chainCert, key); err != nil {
 			log.Error(err, "Failed to sync certificate to ACM")
-			return ctrl.Result{}, err
+			return ctrl.Result{RequeueAfter: 5 * time.Minute}, err
 		}
 	}
 
 	log.Info("Sucessfully synced certificate to ACM")
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: 24 * time.Hour}, nil
 }
 
 func (r *SecretReconciler) importToAcm(ctx context.Context, acmClient *acm.Client, secret *corev1.Secret, certPEM, chainPEM, keyPEM []byte) error {
@@ -137,14 +136,14 @@ func (r *SecretReconciler) importToAcm(ctx context.Context, acmClient *acm.Clien
 	return nil
 }
 
-func (r *SecretReconciler) updateToAcm(ctx context.Context, acmClient *acm.Client, secret *corev1.Secret, certificateArn string, certPEM, chainPEM, keyPEM []byte) error {
+func (r *SecretReconciler) updateToAcm(ctx context.Context, acmClient *acm.Client, secret *corev1.Secret, certificateArn *string, certPEM, chainPEM, keyPEM []byte) error {
 
 	// https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/acm#ImportCertificateInput
 	input := &acm.ImportCertificateInput{
 		Certificate:      certPEM,
 		PrivateKey:       keyPEM,
 		CertificateChain: chainPEM,
-		CertificateArn:   &certificateArn,
+		CertificateArn:   certificateArn,
 		Tags: []types.Tag{
 			{
 				Key:   aws.String("kubernetes-secrets"),
