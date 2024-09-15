@@ -3,7 +3,7 @@ kind: Namespace
 metadata:
   labels:
     control-plane: controller-manager
-    app.kubernetes.io/name: cert-sync-controller
+    app.kubernetes.io/name: cert-sync
     app.kubernetes.io/managed-by: kustomize
   name: system
 ---
@@ -14,7 +14,7 @@ metadata:
   namespace: system
   labels:
     control-plane: controller-manager
-    app.kubernetes.io/name: cert-sync-controller
+    app.kubernetes.io/name: cert-sync
     app.kubernetes.io/managed-by: kustomize
 spec:
   selector:
@@ -63,7 +63,7 @@ spec:
         args:
           - --leader-elect
           - --health-probe-bind-address=:8081
-        image: controller:latest
+        image: denyshubh/cert-sync-controller:latest
         name: manager
         securityContext:
           allowPrivilegeEscalation: false

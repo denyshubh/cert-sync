@@ -27,7 +27,7 @@ import (
 	"github.com/denyshubh/cert-sync/test/utils"
 )
 
-const namespace = "cert-sync-controller-system"
+const namespace = "cert-sync-system"
 
 var _ = Describe("controller", Ordered, func() {
 	BeforeAll(func() {
@@ -60,7 +60,7 @@ var _ = Describe("controller", Ordered, func() {
 			var err error
 
 			// projectimage stores the name of the image used in the example
-			var projectimage = "example.com/cert-sync-controller:v0.0.1"
+			var projectimage = "example.com/cert-sync:v0.0.1"
 
 			By("building the manager(Operator) image")
 			cmd := exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectimage))

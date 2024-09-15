@@ -1,10 +1,10 @@
-# cert-sync-controller
+# cert-sync
 
-`cert-sync-controller` is a Kubernetes controller that automatically syncs TLS certificates issued by [cert-manager](https://cert-manager.io/) to [AWS Certificate Manager (ACM)](https://aws.amazon.com/certificate-manager/). This enables seamless integration of Kubernetes-managed certificates with AWS services like Elastic Load Balancers and CloudFront, ensuring that your AWS resources always have the latest valid certificates without manual intervention.
+`cert-sync` is a Kubernetes controller that automatically syncs TLS certificates issued by [cert-manager](https://cert-manager.io/) to [AWS Certificate Manager (ACM)](https://aws.amazon.com/certificate-manager/). This enables seamless integration of Kubernetes-managed certificates with AWS services like Elastic Load Balancers and CloudFront, ensuring that your AWS resources always have the latest valid certificates without manual intervention.
 
 ## Description
 
-The `cert-sync-controller` watches for Kubernetes `Secret` resources of type `kubernetes.io/tls` that are annotated for synchronization. When it detects a new or updated certificate issued by cert-manager, it checks if the certificate already exists in AWS ACM. If the certificate is new or has expired in ACM, the controller imports it into ACM. This process automates the distribution of certificates to AWS services, simplifies certificate management, and enhances security by keeping your AWS services up-to-date with the latest certificates issued in your Kubernetes cluster.
+The `cert-sync` watches for Kubernetes `Secret` resources of type `kubernetes.io/tls` that are annotated for synchronization. When it detects a new or updated certificate issued by cert-manager, it checks if the certificate already exists in AWS ACM. If the certificate is new or has expired in ACM, the controller imports it into ACM. This process automates the distribution of certificates to AWS services, simplifies certificate management, and enhances security by keeping your AWS services up-to-date with the latest certificates issued in your Kubernetes cluster.
 
 ## Getting Started
 
@@ -22,7 +22,7 @@ The `cert-sync-controller` watches for Kubernetes `Secret` resources of type `ku
 **1. Build and push your image to the location specified by `IMG`:**
 
 ```sh
-make docker-build docker-push IMG=<your-registry>/cert-sync-controller:<tag>
+make docker-build docker-push IMG=<your-registry>/cert-sync:<tag>
 ```
 
 **NOTE:** Ensure that the image is pushed to a container registry accessible by your Kubernetes cluster (e.g., Docker Hub, ECR). You need proper permissions to push to the registry.
@@ -30,7 +30,7 @@ make docker-build docker-push IMG=<your-registry>/cert-sync-controller:<tag>
 **2. Deploy the controller to the cluster with the image specified by `IMG`:**
 
 ```sh
-make deploy IMG=<your-registry>/cert-sync-controller:<tag>
+make deploy IMG=<your-registry>/cert-sync:<tag>
 ```
 
 > **NOTE:** If you encounter RBAC errors, you may need to grant yourself cluster-admin privileges or ensure you're logged in with sufficient permissions.
@@ -70,7 +70,7 @@ To build the installer and distribute this project to users, follow these steps:
 **1. Build the installer for the image built and published in the registry:**
 
 ```sh
-make build-installer IMG=<your-registry>/cert-sync-controller:<tag>
+make build-installer IMG=<your-registry>/cert-sync:<tag>
 ```
 
 **NOTE:** The command above generates an `install.yaml` file in the `dist` directory. This file contains all the Kubernetes resources necessary to install the controller.
@@ -80,14 +80,14 @@ make build-installer IMG=<your-registry>/cert-sync-controller:<tag>
 Users can install the project by running:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/<your-org>/cert-sync-controller/<tag-or-branch>/dist/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/<your-org>/cert-sync/<tag-or-branch>/dist/install.yaml
 ```
 
 Replace `<your-org>`, `<tag-or-branch>`, and other placeholders with your actual GitHub organization and release tag or branch.
 
 ## Contributing
 
-Contributions are welcome! To contribute to `cert-sync-controller`, please follow these steps:
+Contributions are welcome! To contribute to `cert-sync`, please follow these steps:
 
 1. **Fork** the repository on GitHub.
 2. **Create a new branch** for your feature or bugfix:

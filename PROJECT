@@ -5,6 +5,6 @@
 domain: github.com/denyshubh
 layout:
 - go.kubebuilder.io/v4
-projectName: cert-sync-controller
+projectName: cert-sync
 repo: github.com/denyshubh/cert-sync
 version: "3"
