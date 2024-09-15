@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"context"
+	"encoding/pem"
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -75,8 +77,12 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// Extract the certificate and key
-	cert := secret.Data[corev1.TLSCertKey]
+	originalCrt := secret.Data[corev1.TLSCertKey]
 	key := secret.Data[corev1.TLSPrivateKeyKey]
+	leafCert, chainCert, err := splitCertificateChain(originalCrt)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	if existingCertificate != nil {
 		log.Info("Found certificate in ACM", "CertificateArn: ", *existingCertificate.CertificateArn, "NotAfter: ", *existingCertificate.NotAfter)
@@ -85,7 +91,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 			// Process to sync (import) the certificate
 
-			if err := r.updateToAcm(ctx, acmClient, &secret, *existingCertificate.CertificateArn, cert, key); err != nil {
+			if err := r.updateToAcm(ctx, acmClient, &secret, *existingCertificate.CertificateArn, leafCert, chainCert, key); err != nil {
 				log.Error(err, "Failed to sync certificate to ACM")
 				return ctrl.Result{}, err
 			}
@@ -97,7 +103,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Info("Certificate does not exist in ACM; importing certificate")
 
 		// Sync to ACM
-		if err := r.importToAcm(ctx, acmClient, &secret, cert, key); err != nil {
+		if err := r.importToAcm(ctx, acmClient, &secret, leafCert, chainCert, key); err != nil {
 			log.Error(err, "Failed to sync certificate to ACM")
 			return ctrl.Result{}, err
 		}
@@ -107,12 +113,13 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return ctrl.Result{}, nil
 }
 
-func (r *SecretReconciler) importToAcm(ctx context.Context, acmClient *acm.Client, secret *corev1.Secret, certPEM, keyPEM []byte) error {
+func (r *SecretReconciler) importToAcm(ctx context.Context, acmClient *acm.Client, secret *corev1.Secret, certPEM, chainPEM, keyPEM []byte) error {
 
 	// https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/acm#ImportCertificateInput
 	input := &acm.ImportCertificateInput{
-		Certificate: certPEM,
-		PrivateKey:  keyPEM,
+		Certificate:      certPEM,
+		PrivateKey:       keyPEM,
+		CertificateChain: chainPEM,
 		Tags: []types.Tag{
 			{
 				Key:   aws.String("kubernetes-secrets"),
@@ -130,13 +137,14 @@ func (r *SecretReconciler) importToAcm(ctx context.Context, acmClient *acm.Clien
 	return nil
 }
 
-func (r *SecretReconciler) updateToAcm(ctx context.Context, acmClient *acm.Client, secret *corev1.Secret, certificateArn string, certPEM, keyPEM []byte) error {
+func (r *SecretReconciler) updateToAcm(ctx context.Context, acmClient *acm.Client, secret *corev1.Secret, certificateArn string, certPEM, chainPEM, keyPEM []byte) error {
 
 	// https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/acm#ImportCertificateInput
 	input := &acm.ImportCertificateInput{
-		Certificate:    certPEM,
-		PrivateKey:     keyPEM,
-		CertificateArn: &certificateArn,
+		Certificate:      certPEM,
+		PrivateKey:       keyPEM,
+		CertificateChain: chainPEM,
+		CertificateArn:   &certificateArn,
 		Tags: []types.Tag{
 			{
 				Key:   aws.String("kubernetes-secrets"),
@@ -204,6 +212,42 @@ func (r *SecretReconciler) findSecretByDomain(ctx context.Context, acmClient *ac
 	}
 	// certificate not found
 	return nil, nil
+}
+
+// splitCertificateChain splits the PEM-encoded certificate chain into the leaf certificate and the certificate chain.
+func splitCertificateChain(certChainPEM []byte) (leafCertPEM []byte, chainPEM []byte, err error) {
+	var certBlocks []*pem.Block
+	rest := certChainPEM
+
+	// Decode all PEM blocks
+	for {
+		var block *pem.Block
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break // No more PEM blocks
+		}
+		if block.Type == "CERTIFICATE" {
+			certBlocks = append(certBlocks, block)
+		}
+	}
+
+	if len(certBlocks) == 0 {
+		return nil, nil, fmt.Errorf("no certificates found in PEM data")
+	}
+
+	// The first certificate is the leaf certificate
+	leafCertPEM = pem.EncodeToMemory(certBlocks[0])
+
+	// If there are additional certificates, they form the certificate chain
+	if len(certBlocks) > 1 {
+		var chainBytes []byte
+		for _, block := range certBlocks[1:] {
+			chainBytes = append(chainBytes, pem.EncodeToMemory(block)...)
+		}
+		chainPEM = chainBytes
+	}
+
+	return leafCertPEM, chainPEM, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
