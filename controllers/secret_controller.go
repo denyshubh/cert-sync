@@ -144,12 +144,6 @@ func (r *SecretReconciler) updateToAcm(ctx context.Context, acmClient *acm.Clien
 		PrivateKey:       keyPEM,
 		CertificateChain: chainPEM,
 		CertificateArn:   certificateArn,
-		Tags: []types.Tag{
-			{
-				Key:   aws.String("kubernetes-secrets"),
-				Value: aws.String(secret.Namespace + "/" + secret.Name),
-			},
-		},
 	}
 
 	// Import the certificate
