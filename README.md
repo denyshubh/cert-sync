@@ -8,6 +8,13 @@
 
 The `cert-sync` watches for Kubernetes `Secret` resources of type `kubernetes.io/tls` that are annotated for synchronization. When it detects a new or updated certificate issued by cert-manager, it checks if the certificate already exists in AWS ACM. If the certificate is new or has expired in ACM, the controller imports it into ACM. This process automates the distribution of certificates to AWS services, simplifies certificate management, and enhances security by keeping your AWS services up-to-date with the latest certificates issued in your Kubernetes cluster.
 
+### Key Features
+
+- Automatic synchronization of TLS certificates from Kubernetes to AWS ACM
+- Support for specifying target AWS regions via annotations
+- Automatic certificate renewal when certificates are about to expire
+- Tagging of ACM certificates for easy identification and management
+
 ## Getting Started
 
 ### Prerequisites
@@ -64,6 +71,38 @@ kubectl delete -f samples/sample-tls-secret.yaml
 ```sh
 make undeploy
 ```
+
+## Usage
+
+### Annotations
+
+The controller uses the following annotations on `Secret` resources to control its behavior:
+
+- `sync-to-acm: "true"` - Enables synchronization of the certificate to AWS ACM
+- `cert-manager.io/common-name: "example.com"` - Specifies the domain name for the certificate
+- `acm-region: "us-west-2"` - (Optional) Specifies the AWS region where the certificate should be imported. If not provided, the controller uses the same region as the EKS cluster.
+
+### Example Secret with Region Specification
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sample-tls-secret
+  namespace: default
+  annotations:
+    sync-to-acm: "true"
+    cert-manager.io/common-name: "example.com"
+    acm-region: "us-east-1"  # Certificate will be imported to us-east-1 region
+type: kubernetes.io/tls
+data:
+  tls.crt: <BASE64_ENCODED_CERTIFICATE>
+  tls.key: <BASE64_ENCODED_PRIVATE_KEY>
+```
+
+### Multi-Region Deployment
+
+For certificates that need to be available in multiple AWS regions, you can create multiple Secret resources with the same certificate data but different region annotations.
 
 ## Project Distribution
 
@@ -156,6 +195,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
     annotations:
       sync-to-acm: "true"
       cert-manager.io/common-name: "example.com"
+      acm-region: "us-west-2"  # Optional: Specify AWS region
   type: kubernetes.io/tls
   data:
     tls.crt: <BASE64_ENCODED_CERTIFICATE>
@@ -171,7 +211,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
 
 - **Environment Variables:**
 
-  - You can specify the AWS region and other configurations via environment variables in the `manager.yaml` file.
+  - You can specify the default AWS region and other configurations via environment variables in the `manager.yaml` file.
 
 - **Leader Election:**
 

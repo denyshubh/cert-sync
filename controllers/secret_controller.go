@@ -27,17 +27,9 @@ type SecretReconciler struct {
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop
-
 func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("secret", req.NamespacedName)
 	log.Info("Reconciling Secret")
-
-	// Initialize AWS ACM Client
-	acmClient, err := awsclient.NewACMClient(ctx)
-	if err != nil {
-		log.Error(err, "Failed to initialize AWS ACM Client")
-		return ctrl.Result{}, err
-	}
 
 	// Fetch the Secret Instance
 	var secret corev1.Secret
@@ -69,6 +61,20 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
+	// Get region from annotation or use default
+	region := ""
+	if regionAnnotation, exists := secret.Annotations["acm-region"]; exists && regionAnnotation != "" {
+		region = regionAnnotation
+		log.Info("Using region from annotation", "region", region)
+	}
+
+	// Initialize AWS ACM Client with specified region
+	acmClient, err := awsclient.NewACMClientWithRegion(ctx, region)
+	if err != nil {
+		log.Error(err, "Failed to initialize AWS ACM Client", "region", region)
+		return ctrl.Result{}, err
+	}
+
 	// Find existing certificate in ACM
 	existingCertificate, err := r.findSecretByDomain(ctx, acmClient, domainName)
 	if err != nil {
@@ -85,7 +91,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	if existingCertificate != nil {
-		log.Info("Found certificate in ACM", "CertificateArn: ", aws.ToString(existingCertificate.CertificateArn), "NotAfter: ", aws.ToTime(existingCertificate.NotAfter))
+		log.Info("Found certificate in ACM", "CertificateArn", aws.ToString(existingCertificate.CertificateArn), "NotAfter", aws.ToTime(existingCertificate.NotAfter))
 		if existingCertificate.NotAfter != nil && existingCertificate.NotAfter.Before(time.Now().Add(72*time.Hour)) {
 			log.Info("Certificate exists in ACM and is going to expire; updating certificate")
 
@@ -108,7 +114,7 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
-	log.Info("Sucessfully synced certificate to ACM")
+	log.Info("Successfully synced certificate to ACM")
 	return ctrl.Result{RequeueAfter: 24 * time.Hour}, nil
 }
 
