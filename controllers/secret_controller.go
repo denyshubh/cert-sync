@@ -68,13 +68,22 @@ func (r *SecretReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		log.Info("Using region from annotation", "region", region)
 	}
 
-	// Initialize AWS ACM Client with specified region
-	acmClient, err := awsclient.NewACMClientWithRegion(ctx, region)
-	if err != nil {
-		log.Error(err, "Failed to initialize AWS ACM Client", "region", region)
-		return ctrl.Result{}, err
+	// Get role ARN from annotation if it exists
+	roleARN := ""
+	if roleAnnotation, exists := secret.Annotations["acm-role-arn"]; exists && roleAnnotation != "" {
+		roleARN = roleAnnotation
+		log.Info("Using role ARN from annotation", "roleARN", roleARN)
 	}
 
+	// Initialize AWS ACM Client with specified region and role
+	acmClient, err := awsclient.NewACMClientWithOptions(ctx, awsclient.ACMClientOptions{
+		Region:  region,
+		RoleARN: roleARN,
+	})
+	if err != nil {
+		log.Error(err, "Failed to initialize AWS ACM Client", "region", region, "roleARN", roleARN)
+		return ctrl.Result{}, err
+	}
 	// Find existing certificate in ACM
 	existingCertificate, err := r.findSecretByDomain(ctx, acmClient, domainName)
 	if err != nil {
