@@ -12,6 +12,7 @@ The `cert-sync` watches for Kubernetes `Secret` resources of type `kubernetes.io
 
 - Automatic synchronization of TLS certificates from Kubernetes to AWS ACM
 - Support for specifying target AWS regions via annotations
+- Support for assuming specific IAM roles via annotations
 - Automatic certificate renewal when certificates are about to expire
 - Tagging of ACM certificates for easy identification and management
 
@@ -25,6 +26,7 @@ The `cert-sync` watches for Kubernetes `Secret` resources of type `kubernetes.io
 - Access to a **Kubernetes v1.28+** cluster
 - An **AWS account** with permissions to use AWS Certificate Manager (ACM)
   - Necessary IAM permissions: `acm:ImportCertificate`, `acm:ListCertificates`, `acm:DescribeCertificate`, `acm:AddTagsToCertificate`
+  - If using assume role functionality: `sts:AssumeRole` permission for the controller's service account
 
 ### To Deploy on the Cluster
 
@@ -81,8 +83,9 @@ The controller uses the following annotations on `Secret` resources to control i
 - `sync-to-acm: "true"` - Enables synchronization of the certificate to AWS ACM
 - `cert-manager.io/common-name: "example.com"` - Specifies the domain name for the certificate
 - `acm-region: "us-west-2"` - (Optional) Specifies the AWS region where the certificate should be imported. If not provided, the controller uses the same region as the EKS cluster.
+- `acm-role-arn: "arn:aws:iam::123456789012:role/cert-sync-role"` - (Optional) Specifies an IAM role ARN to assume when performing ACM operations. This allows fine-grained control over permissions.
 
-### Example Secret with Region Specification
+### Example Secret with Region and Role Specification
 
 ```yaml
 apiVersion: v1
@@ -94,15 +97,52 @@ metadata:
     sync-to-acm: "true"
     cert-manager.io/common-name: "example.com"
     acm-region: "us-east-1"  # Certificate will be imported to us-east-1 region
+    acm-role-arn: "arn:aws:iam::123456789012:role/cert-sync-role"  # Operations will use this role
 type: kubernetes.io/tls
 data:
   tls.crt: <BASE64_ENCODED_CERTIFICATE>
   tls.key: <BASE64_ENCODED_PRIVATE_KEY>
 ```
 
+### Using IAM Roles
+
+The controller supports assuming different IAM roles for different certificates, which provides several benefits:
+
+1. **Least Privilege**: The controller's base IAM role can have minimal permissions, with specific permissions granted only through assumed roles.
+2. **Multi-Account Support**: You can sync certificates to ACM in different AWS accounts by assuming roles in those accounts.
+3. **Separation of Concerns**: Different teams can manage their own IAM roles with specific permissions.
+
+To use this feature:
+
+1. Create IAM roles in your AWS account(s) with the necessary ACM permissions.
+2. Configure trust relationships to allow the controller's IAM role or service account to assume these roles.
+3. Add the `acm-role-arn` annotation to your certificate secrets.
+
+Example IAM role trust policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::123456789012:role/cert-sync-controller-role"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {}
+    }
+  ]
+}
+```
+
 ### Multi-Region Deployment
 
 For certificates that need to be available in multiple AWS regions, you can create multiple Secret resources with the same certificate data but different region annotations.
+
+### Multi-Account Deployment
+
+For certificates that need to be available in multiple AWS accounts, use the `acm-role-arn` annotation with roles from different accounts that have appropriate trust relationships configured.
 
 ## Project Distribution
 
@@ -196,6 +236,7 @@ Unless required by applicable law or agreed to in writing, software distributed 
       sync-to-acm: "true"
       cert-manager.io/common-name: "example.com"
       acm-region: "us-west-2"  # Optional: Specify AWS region
+      acm-role-arn: "arn:aws:iam::123456789012:role/cert-sync-role"  # Optional: Specify role ARN
   type: kubernetes.io/tls
   data:
     tls.crt: <BASE64_ENCODED_CERTIFICATE>
@@ -208,6 +249,12 @@ Unless required by applicable law or agreed to in writing, software distributed 
 
   - If you're running on Amazon EKS, it's recommended to use [IAM Roles for Service Accounts (IRSA)](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html) to grant AWS permissions to your controller.
   - Ensure that your IAM role has the necessary permissions specified in the prerequisites.
+  - When using the assume role feature, ensure the controller's role or service account has the `sts:AssumeRole` permission.
+
+- **Cross-Account Role Assumption:**
+
+  - For cross-account access, configure appropriate trust relationships between accounts.
+  - The controller's service account must have permission to assume roles in other accounts.
 
 - **Environment Variables:**
 
