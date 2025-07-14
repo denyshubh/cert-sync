@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cert-sync.fullname" . }}-controller-manager-metrics-service
+  namespace: {{ include "cert-sync.namespace" . }}
+  labels:
+    {{- include "cert-sync.labels" . | nindent 4 }}
+    control-plane: controller-manager
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+  - name: {{ .Values.service.name }}
+    port: {{ .Values.service.port }}
+    protocol: TCP
+    targetPort: {{ .Values.service.targetPort }}
+  selector:
+    {{- include "cert-sync.selectorLabels" . | nindent 4 }} 

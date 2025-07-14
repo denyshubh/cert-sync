@@ -1,0 +1,18 @@
+1. Your cert-sync controller has been deployed successfully!
+
+2. The controller is running in namespace: {{ include "cert-sync.namespace" . }}
+
+3. To check the status of the deployment, run:
+   kubectl get deployment {{ include "cert-sync.fullname" . }}-controller-manager -n {{ include "cert-sync.namespace" . }}
+
+4. To view the logs, run:
+   kubectl logs -f deployment/{{ include "cert-sync.fullname" . }}-controller-manager -n {{ include "cert-sync.namespace" . }}
+
+5. To check the controller's metrics:
+   kubectl port-forward service/{{ include "cert-sync.fullname" . }}-controller-manager-metrics-service {{ .Values.service.port }}:{{ .Values.service.port }} -n {{ include "cert-sync.namespace" . }}
+
+6. Make sure to update the serviceAccount annotation with your actual AWS account ID:
+   helm upgrade {{ .Release.Name }} ./helm/cert-sync --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="arn:aws:iam::YOUR_AWS_ACCOUNT_ID:role/eks-acm-controller"
+
+7. To customize the image version:
+   helm upgrade {{ .Release.Name }} ./helm/cert-sync --set image.tag=v1.0.0 

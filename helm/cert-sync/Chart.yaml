@@ -1,0 +1,17 @@
+apiVersion: v2
+name: cert-sync
+description: A Helm chart for cert-sync controller that syncs certificates from AWS ACM to Kubernetes secrets
+type: application
+version: 0.1.0
+appVersion: "latest"
+maintainers:
+  - name: cert-sync-team
+keywords:
+  - certificates
+  - aws
+  - acm
+  - kubernetes
+  - controller
+home: https://github.com/your-org/cert-sync
+sources:
+  - https://github.com/your-org/cert-sync 

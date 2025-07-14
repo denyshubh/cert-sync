@@ -1,0 +1,86 @@
+# Default values for cert-sync
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: denyshubh/cert-sync-controller
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::<AWS_ACCOUNT_ID>:role/eks-acm-controller
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+
+service:
+  type: ClusterIP
+  port: 8443
+  targetPort: 8443
+  name: https
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+# Probes configuration
+probes:
+  liveness:
+    path: /healthz
+    port: 8081
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  readiness:
+    path: /readyz
+    port: 8081
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+# Controller configuration
+controller:
+  # Command line arguments
+  args:
+    - --metrics-bind-address=:8443
+    - --leader-elect
+    - --health-probe-bind-address=:8081
+
+# Namespace configuration
+namespace:
+  create: true
+  name: cert-sync-system
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# RBAC configuration
+rbac:
+  create: true 
